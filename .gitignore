@@ -1,0 +1,6 @@
+# /
+/dev
+/clusterflow.config
+/genomes.config
+*.pyc
+.cfupdates
