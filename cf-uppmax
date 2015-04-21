@@ -78,10 +78,13 @@ if($cl_add_genome){
 	my $fn = "$homedir/.clusterflow/genomes.config";
 	print "\nCluster Flow UPPMAX Genomes Config Generator\n".('='x45)."\n";
 	print "This wizard will add UPPMAX reference genome paths to your genomes.config file.\n";
+	my $newfile;
 	if(-e $fn){
 		print "These will be appended to $fn\n\n";
+		$newfile = 0;
 	} else {
 		print "A new file will be created: $fn\n\n";
+		$newfile = 1;
 	}
 
 	# Check that we can find our expected paths
@@ -98,6 +101,18 @@ if($cl_add_genome){
 			mkdir ($homedir."/.clusterflow/") or die "Can't create clusterflow directory: $!";
 	}
 	open (OUT,'>>',$fn) or die "Can't write to $fn: $!";
+	if($newfile){
+		print OUT "/*
+Clusterflow Genomes
+-------------------
+Genome paths for clusterflow.
+Syntax - \@reference\t<ref_type>\t<key>\t<path>\t(<species>)\t(<assembly>)
+Species and assembly are optional and only serve as additional information
+when listing genomes with 'cf --genomes'
+Fields are delimited by whitespace, so do not include spaces in fields.
+-------------------
+*/\n";
+	}
 
 	###############
 	## iGenomes
