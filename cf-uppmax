@@ -3,6 +3,8 @@ use warnings;
 use strict;
 use Getopt::Long;
 
+no warnings qw(once);
+
 ##########################################################################
 # Copyright 2014, Philip Ewels (phil.ewels@scilifelab.se)                #
 #                                                                        #
@@ -27,6 +29,11 @@ use Getopt::Long;
 # subdirectory is also added to the PATH, making this file accessible
 # on the command line by using 'cf-uppmax'
 ####
+
+# Set up common variables
+my $homedir = $ENV{"HOME"};
+my $iGenomes_path = '/sw/data/uppnex/igenomes';
+my $uppnex_path = '/sw/data/uppnex/reference';
 
 # Command line flags
 my $cl_add_genome;
@@ -60,4 +67,64 @@ COMMAND LINE PARAMETERS
 Please run 'cf --help' to see help about the core Cluster Flow program.\n
 HELP
   exit;
+}
+
+if($cl_add_genome){
+	my $fn = "$homedir/.clusterflow/genomes.config";
+	print "\nCluster Flow UPPMAX Genomes Config Generator\n".('='x45)."\n";
+	print "This wizard will add UPPMAX reference genome paths to your genomes.config file\n";
+	if(-e $fn){
+		print "These will be appended to $fn\n\n";
+	} else {
+		print "A new file will be created: $fn\n\n";
+	}
+
+	# Check that we can find our expected paths
+	# unless(-e $iGenomes_path and -e $uppnex_path){
+	# 	print "Error - can't find reference genome locations:\n".
+	# 				"  $iGenomes_path\n  $uppnex_path\n\n".
+	# 				"Are you sure that we're running on UPPMAX?\n".
+	# 				"If so, please let the author know: phil.ewels\@scilifelab.se\n\n";
+	# 	exit;
+	# }
+
+	# Make directory and open file for appending - we want any errors up front
+	unless(-e $homedir."/.clusterflow/" && -d $homedir."/.clusterflow/"){
+			mkdir ($homedir."/.clusterflow/") or die "Can't create clusterflow directory: $!";
+	}
+	open (OUT,'>>',$fn) or die "Can't write to $fn: $!";
+
+	###############
+	## iGenomes
+	###############
+	print "Illumina iGenomes are a collection of reference sequences and annotation files\n".
+	 			"for commonly analyzed organisms. They are curated by Illumina and have references\n".
+				"from UCSC, NCBI and Ensembl. For more information, see:\n".
+				"http://support.illumina.com/sequencing/sequencing_software/igenome.html\n\n".
+				"Would you like to use any of the following iGenome references?\n".
+				"Type a number to add that organism, or just press enter to skip..\n\n";
+	my @iGenomes_files = <$iGenomes_path*>;
+	my $i = 1;
+	foreach my $f (@iGenomes_files) {
+		if(-d $f){
+			print "  $i - $f\n";
+			$i++;
+		}
+	}
+	my $iGenomes = 0;
+	while (my $iGenomes = <STDIN>){
+			chomp ($iGenomes);
+			if ($iGenomes =~ /^n(o)?/i){
+					print "\nOk, no iGenomes.\n";
+					sleep(1); last;
+			} elsif($iGenomes =~ /^y(es)?/i){
+					print "\nAWESOME! WOO YEAH ILLUMINA!\n";
+					sleep(1); last;
+			} else {
+					print "\nSorry, I didn't understand that.\nCould you try again please? (y/n)\n\n";
+			}
+	}
+
+	# print OUT $config;
+	close OUT;
 }
