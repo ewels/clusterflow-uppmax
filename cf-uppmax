@@ -2,6 +2,10 @@
 use warnings;
 use strict;
 use Getopt::Long;
+use Term::ANSIColor;
+use FindBin qw($Bin);
+use lib "$FindBin::Bin/../source";
+use CF::Constants;
 
 no warnings qw(once);
 
@@ -70,9 +74,10 @@ HELP
 }
 
 if($cl_add_genome){
+	my %REFERENCES = %CF::Constants::REFERENCES;
 	my $fn = "$homedir/.clusterflow/genomes.config";
 	print "\nCluster Flow UPPMAX Genomes Config Generator\n".('='x45)."\n";
-	print "This wizard will add UPPMAX reference genome paths to your genomes.config file\n";
+	print "This wizard will add UPPMAX reference genome paths to your genomes.config file.\n";
 	if(-e $fn){
 		print "These will be appended to $fn\n\n";
 	} else {
@@ -80,13 +85,13 @@ if($cl_add_genome){
 	}
 
 	# Check that we can find our expected paths
-	# unless(-e $iGenomes_path and -e $uppnex_path){
-	# 	print "Error - can't find reference genome locations:\n".
-	# 				"  $iGenomes_path\n  $uppnex_path\n\n".
-	# 				"Are you sure that we're running on UPPMAX?\n".
-	# 				"If so, please let the author know: phil.ewels\@scilifelab.se\n\n";
-	# 	exit;
-	# }
+	unless(-e $iGenomes_path and -e $uppnex_path){
+		print "Error - can't find reference genome locations:\n".
+					"  $iGenomes_path\n  $uppnex_path\n\n".
+					"Are you sure that we're running on UPPMAX?\n".
+					"If so, please let the author know: phil.ewels\@scilifelab.se\n\n";
+		exit;
+	}
 
 	# Make directory and open file for appending - we want any errors up front
 	unless(-e $homedir."/.clusterflow/" && -d $homedir."/.clusterflow/"){
@@ -101,30 +106,192 @@ if($cl_add_genome){
 	 			"for commonly analyzed organisms. They are curated by Illumina and have references\n".
 				"from UCSC, NCBI and Ensembl. For more information, see:\n".
 				"http://support.illumina.com/sequencing/sequencing_software/igenome.html\n\n".
-				"Would you like to use any of the following iGenome references?\n".
-				"Type a number to add that organism, or just press enter to skip..\n\n";
-	my @iGenomes_files = <$iGenomes_path*>;
-	my $i = 1;
-	foreach my $f (@iGenomes_files) {
-		if(-d $f){
-			print "  $i - $f\n";
-			$i++;
-		}
-	}
-	my $iGenomes = 0;
-	while (my $iGenomes = <STDIN>){
-			chomp ($iGenomes);
-			if ($iGenomes =~ /^n(o)?/i){
-					print "\nOk, no iGenomes.\n";
-					sleep(1); last;
-			} elsif($iGenomes =~ /^y(es)?/i){
-					print "\nAWESOME! WOO YEAH ILLUMINA!\n";
-					sleep(1); last;
-			} else {
-					print "\nSorry, I didn't understand that.\nCould you try again please? (y/n)\n\n";
+				"Note that iGenomes do not currently have STAR aligner indexes.\n\n";
+	my $select_igenomes = 1;
+	while($select_igenomes){
+		print "Would you like to use any of the following iGenome references?\n\n";
+		my @iGenomes_files = <$iGenomes_path/*>;
+		my %igenomes;
+		my $i = 1;
+		foreach my $f (@iGenomes_files) {
+			if(-d $f){
+				$f =~ s/^$iGenomes_path\///;
+				$igenomes{$i} = $f;
+				$i++;
 			}
-	}
+		}
+		# Over-complicated two-column display
+		my $num_igenomes = keys %igenomes;
+		my @top_genomes = ('Drosophila_melanogaster', 'Homo_sapiens', 'Mus_musculus', 'Saccharomyces_cerevisiae');
+		foreach my $i (sort {$a<=>$b} keys %igenomes) {
+			# First column
+			my $thisprint = "  $i - $igenomes{$i}";
+			my $len = length($thisprint);
+		  if ("@top_genomes" =~ /$igenomes{$i}/){
+				$thisprint = "  $i - ".(color 'green')."$igenomes{$i}".(color 'reset');
+			}
+			print $thisprint;
+			print (" "x(40-$len));
+			# Second column
+			my $j = int(($num_igenomes/2) + 0.5)+$i;
+			if(defined($igenomes{$j})){
+				if ("@top_genomes" =~ /$igenomes{$j}/){
+					print "  $j - ".(color 'green')."$igenomes{$j}".(color 'reset')."\n";
+				} else {
+					print "  $j - $igenomes{$j}\n";
+				}
+			} else {
+				print "\n";
+			}
+			# Kill when done
+			last if($i > ($num_igenomes/2) - 0.5);
+		}
+		print "\nType a number to add that organism, or leave blank and press enter to go on to the UPPNEX genomes..\n\n";
 
-	# print OUT $config;
+		# User input
+		my $igchoice = 0;
+		while ($igchoice = <STDIN>){
+				chomp ($igchoice);
+				if ($igchoice =~ /^\d+$/ and $igchoice <= $num_igenomes){
+						print "\nGreat! Let's go with '$igenomes{$igchoice}'\n\n";
+						last;
+				} elsif(length($igchoice) == 0){
+						print "\nOk, on to the next step..\n";
+						$select_igenomes = 0;
+						$igchoice = 0;
+						sleep(1); last;
+				} else {
+						print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+				}
+		}
+
+		if($igchoice > 0){
+			my @sources_files = <$iGenomes_path/$igenomes{$igchoice}/*>;
+			my @sources;
+			foreach my $f (@sources_files) {
+				if(-d $f){
+					$f =~ s/^$iGenomes_path\/$igenomes{$igchoice}\///;
+					push @sources, $f;
+				}
+			}
+			my $source;
+			if(scalar(@sources) == 1){
+				$source = $sources[0];
+				print "Only one genome build found, so using $source\n";
+				sleep(1);
+			} else {
+				print "I found ".scalar(@sources)." sources for this genome:\n\n";
+				for my $i (1..scalar(@sources)){
+					print "  $i - $sources[$i-1]\n";
+				}
+				print "\nWhich would you like to use?\n\n";
+
+				my $source_choice = 0;
+				while ($source_choice = <STDIN>){
+						chomp ($source_choice);
+						if ($source_choice =~ /^\d+$/ and $source_choice <= scalar(@sources)){
+								print "\nNice! Using '$sources[$source_choice-1]'\n\n";
+								$source = $sources[$source_choice-1];
+								last;
+						} else {
+								print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+						}
+				}
+			}
+
+			my @build_files = <$iGenomes_path/$igenomes{$igchoice}/$source/*>;
+			my @builds;
+			foreach my $f (@build_files) {
+				if(-d $f){
+					$f =~ s/^$iGenomes_path\/$igenomes{$igchoice}\/$source\///;
+					push @builds, $f;
+				}
+			}
+			my $build;
+			if(scalar(@builds) == 1){
+				$build = $builds[0];
+				print "Only one genome build found, so going ahead with '$igenomes{$igchoice} - $build' ($source)\n";
+				sleep(1);
+			} else {
+				print "I found ".scalar(@builds)." sources for $igenomes{$igchoice} ($source):\n\n";
+				for my $i (1..scalar(@builds)){
+					print "  $i - $builds[$i-1]\n";
+				}
+				print "\nWhich would you like to use?\n\n";
+
+				my $build_choice = 0;
+				while ($build_choice = <STDIN>){
+						chomp ($build_choice);
+						if ($build_choice =~ /^\d+$/ and $build_choice <= scalar(@builds)){
+								$build = $builds[$build_choice-1];
+								print "\nOk great, going with '$igenomes{$igchoice} - $build' ($source)'\n\n";
+								sleep(1); last;
+						} else {
+								print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+						}
+				}
+			}
+
+			my $name;
+			print "Finally, we need a name for this reference for use in Cluster Flow.\n".
+						"For example, you typically launch pipelines with a command such as:\n".
+						"  cf --genome <name> <pipeline> <files>\n\n";
+			my $name_exists = 0;
+			foreach my $type (values %REFERENCES){
+				foreach my $ref (keys %{$type}){
+					$name_exists = 1 if($build =~ /^$ref$/);
+				}
+			}
+			if($name_exists){
+				print "You already have a genome called '$build', please choose a new name..\n\n";
+			} else {
+				print "Leave blank and press enter to use the genome build name ($build)\n\n";
+			}
+
+			my $name_choice;
+			while ($name_choice = <STDIN>){
+					chomp ($name_choice);
+					if (length($name_choice) == 0 && !$name_exists){
+							print "Ok, I'll call this reference '$build' - you can use it as follows:\n".
+										"  cf --genome $build <pipeline> <files>\n\n";
+							$name = $build;
+							sleep(1); last;
+					} elsif($name_choice =~ /[^\w-]/){
+							print "\nSorry, names can only contain the following: A-Z a-z 0-9 _ -\n\n";
+					} elsif($name_exists){
+							print "\nSorry, '$build' already exists, please choose a different name..\n\n";
+					} else {
+							my $t_name_exists = 0;
+							foreach my $type (values %REFERENCES){
+								foreach my $ref (keys %{$type}){
+									$t_name_exists = 1 if($name_choice =~ /^$ref$/);
+								}
+							}
+							if($t_name_exists){
+								print "\nSorry, you already have a genome called '$name_choice' - please choose another name.\n\n";
+							} else {
+								print "\nGreat, I'll call this reference '$name_choice' - you can use it as follows:\n".
+											"  cf --genome $name_choice <pipeline> <files>\n\n";
+								$name = $name_choice;
+								sleep(1); last;
+							}
+					}
+			}
+
+			print OUT "\n/* $igenomes{$igchoice} $build (UPPMAX iGenomes) */\n".
+								"\@reference\tfasta\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/WholeGenomeFasta\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbowtie\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/BowtieIndex/genome\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbowtie2\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/Bowtie2Index/genome\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbwa\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/BWAIndex/genome.fa\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tgtf\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Annotation/Genes/genes.gtf\t$igenomes{$igchoice}\t$build\n\n";
+
+			print "You can add another iGenome reference now if you would like.\n";
+
+		} # if($igchoice)
+	} # while($select_igenomes)
+
+	# TODO: UPPNEX reference genomes
+	print "\nCentral UPPNEX reference genomes not yet implemented in this wizard sorry..\n\n";
+
 	close OUT;
 }
