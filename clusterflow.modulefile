@@ -1,0 +1,47 @@
+#%Module1.0#####################################################################
+##
+## Cluster Flow
+##
+
+source /sw/mf/common/includes/functions.tcl
+getCluster
+
+set components [ file split [ module-info name ] ]
+set version [ lindex $components 1 ]
+
+set     modroot	     /sw/apps/bioinfo/clusterflow/$version/$Cluster
+
+proc ModulesHelp { } {
+        global version modroot
+
+        puts stderr "\tCluster Flow - use clusterflow $version"
+        puts stderr "\n\tVersion $version\n"
+}
+
+module-whatis   "Loads Cluster Flow environment."
+
+# load modules
+
+# only one version at a time
+conflict clusterflow
+
+# Log loading to syslog
+logToSyslog
+
+# Directories for the program:
+prepend-path    PATH            $modroot
+prepend-path    PATH            $modroot/scripts
+
+# Look for presence of genomes config file
+if [ ! -f ~/.clusterflow/genomes.config ];
+then
+echo "====================================================================================
+No Cluster Flow reference genomes config file found (~/.clusterflow/genomes.config)
+Run 'cf-uppmax --add_genome' to add UPPMAX genome references (central or iGenomes).
+This runs a user-friendly wizard. For more info about the genome references, see:
+  https://www.uppmax.uu.se/reference-genomes
+  http://support.illumina.com/sequencing/sequencing_software/igenome.html
+
+To add your own custom genome references, run 'cf --add_genome'
+===================================================================================="
+fi

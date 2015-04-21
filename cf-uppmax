@@ -1,0 +1,63 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use Getopt::Long;
+
+##########################################################################
+# Copyright 2014, Philip Ewels (phil.ewels@scilifelab.se)                #
+#                                                                        #
+# This file is part of Cluster Flow.                                     #
+#                                                                        #
+# Cluster Flow is free software: you can redistribute it and/or modify   #
+# it under the terms of the GNU General Public License as published by   #
+# the Free Software Foundation, either version 3 of the License, or      #
+# (at your option) any later version.                                    #
+#                                                                        #
+# Cluster Flow is distributed in the hope that it will be useful,        #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of         #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          #
+# GNU General Public License for more details.                           #
+#                                                                        #
+# You should have received a copy of the GNU General Public License      #
+# along with Cluster Flow.  If not, see <http://www.gnu.org/licenses/>.  #
+##########################################################################
+
+####
+# Note - when the clusterflow environment module is loaded, the scripts
+# subdirectory is also added to the PATH, making this file accessible
+# on the command line by using 'cf-uppmax'
+####
+
+# Command line flags
+my $cl_add_genome;
+my $cl_help;
+my $config_result = GetOptions(
+	"add_genome" => \$cl_add_genome,
+	"help" => \$cl_help
+);
+
+if(!$config_result){
+	die "Error! could not parse command line options.. For help, run cf-uppmax --help\n";
+}
+if(!$cl_add_genome and !$cl_help){
+  die "No command line options supplied.. For help, run cf-uppmax --help\n";
+}
+
+if($cl_help){
+  my $dashes = ('='x70);
+  print <<"HELP";
+$dashes
+ Cluster Flow: UPPMAX Tasks
+$dashes
+This script is used to provide UPPMAX-specific functions to help
+make Cluster Flow easy to use.\n
+COMMAND LINE PARAMETERS
+    --add_genome
+        Interactive wizard to add central UPPMAX reference genomes to
+        your Cluster Flow genomes.config
+    --help
+        Show this help\n
+Please run 'cf --help' to see help about the core Cluster Flow program.\n
+HELP
+  exit;
+}
