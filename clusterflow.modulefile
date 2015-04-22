@@ -37,11 +37,7 @@ if [ ! -f ~/.clusterflow/genomes.config ];
 then
 echo "====================================================================================
 No Cluster Flow reference genomes config file found (~/.clusterflow/genomes.config)
-Run 'cf-uppmax --add_genome' to add UPPMAX genome references (central or iGenomes).
-This runs a user-friendly wizard. For more info about the genome references, see:
-  https://www.uppmax.uu.se/reference-genomes
-  http://support.illumina.com/sequencing/sequencing_software/igenome.html
-
 To add your own custom genome references, run 'cf --add_genome'
+Run 'cf-uppmax --add_genome' to add UPPMAX genome references (central or Illumina iGenomes).
 ===================================================================================="
 fi
