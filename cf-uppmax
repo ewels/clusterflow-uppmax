@@ -9,6 +9,8 @@ use CF::Constants;
 
 no warnings qw(once);
 
+binmode(STDOUT, ":utf8");
+
 ##########################################################################
 # Copyright 2014, Philip Ewels (phil.ewels@scilifelab.se)                #
 #                                                                        #
@@ -38,6 +40,7 @@ no warnings qw(once);
 my $homedir = $ENV{"HOME"};
 my $iGenomes_path = '/sw/data/uppnex/igenomes';
 my $uppnex_path = '/sw/data/uppnex/reference';
+my @top_genomes = ('Drosophila_melanogaster', 'Homo_sapiens', 'Mus_musculus', 'Saccharomyces_cerevisiae');
 
 # Command line flags
 my $cl_add_genome;
@@ -121,15 +124,15 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 	 			"for commonly analyzed organisms. They are curated by Illumina and have references\n".
 				"from UCSC, NCBI and Ensembl. For more information, see:\n".
 				"http://support.illumina.com/sequencing/sequencing_software/igenome.html\n\n".
-				"Note that iGenomes do not currently have STAR aligner indexes.\n\n";
+				"Each iGenome comes with fasta, bowtie, bowtie2, bwa and gtf references.\n\n";
 	my $select_igenomes = 1;
 	while($select_igenomes){
 		print "Would you like to use any of the following iGenome references?\n\n";
-		my @iGenomes_files = <$iGenomes_path/*>;
+		my @iGenomes_files = glob("$iGenomes_path/*");
 		my %igenomes;
 		my $i = 1;
 		foreach my $f (@iGenomes_files) {
-			if(-d $f){
+			if(-d $f and -r $f){
 				$f =~ s/^$iGenomes_path\///;
 				$igenomes{$i} = $f;
 				$i++;
@@ -137,12 +140,11 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 		}
 		# Over-complicated two-column display
 		my $num_igenomes = keys %igenomes;
-		my @top_genomes = ('Drosophila_melanogaster', 'Homo_sapiens', 'Mus_musculus', 'Saccharomyces_cerevisiae');
 		foreach my $i (sort {$a<=>$b} keys %igenomes) {
 			# First column
 			my $thisprint = "  $i - $igenomes{$i}";
 			my $len = length($thisprint);
-		  if ("@top_genomes" =~ /$igenomes{$i}/){
+		  	if ("@top_genomes" =~ /$igenomes{$i}/){
 				$thisprint = "  $i - ".(color 'green')."$igenomes{$i}".(color 'reset');
 			}
 			print $thisprint;
@@ -171,20 +173,20 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 						print "\nGreat! Let's go with '$igenomes{$igchoice}'\n\n";
 						last;
 				} elsif(length($igchoice) == 0){
-						print "\nOk, on to the next step..\n";
+						# On to the UPPNEX genomes..
 						$select_igenomes = 0;
 						$igchoice = 0;
-						sleep(1); last;
+						last;
 				} else {
 						print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
 				}
 		}
 
 		if($igchoice > 0){
-			my @sources_files = <$iGenomes_path/$igenomes{$igchoice}/*>;
+			my @sources_files = glob("$iGenomes_path/$igenomes{$igchoice}/*");
 			my @sources;
 			foreach my $f (@sources_files) {
-				if(-d $f){
+				if(-d $f and -r $f){
 					$f =~ s/^$iGenomes_path\/$igenomes{$igchoice}\///;
 					push @sources, $f;
 				}
@@ -192,12 +194,20 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 			my $source;
 			if(scalar(@sources) == 1){
 				$source = $sources[0];
-				print "Only one genome build found, so using $source\n";
+				print "Only one genome source found, so using $source\n";
 				sleep(1);
 			} else {
 				print "I found ".scalar(@sources)." sources for this genome:\n\n";
 				for my $i (1..scalar(@sources)){
-					print "  $i - $sources[$i-1]\n";
+					my @thisource_builds_fs = glob("$iGenomes_path/$igenomes{$igchoice}/$sources[$i-1]/*");
+					my @thisource_builds;
+					foreach my $b (@thisource_builds_fs){
+						if(-d $b and -r $b){
+							$b =~ s/^$iGenomes_path\/$igenomes{$igchoice}\/$sources[$i-1]\///;
+							push(@thisource_builds, $b);
+						}
+					}
+					print "  $i - $sources[$i-1]\t(".join(", ", @thisource_builds).")\n";
 				}
 				print "\nWhich would you like to use?\n\n";
 
@@ -214,10 +224,10 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 				}
 			}
 
-			my @build_files = <$iGenomes_path/$igenomes{$igchoice}/$source/*>;
+			my @build_files = glob("$iGenomes_path/$igenomes{$igchoice}/$source/*");
 			my @builds;
 			foreach my $f (@build_files) {
-				if(-d $f){
+				if(-d $f and -r $f){
 					$f =~ s/^$iGenomes_path\/$igenomes{$igchoice}\/$source\///;
 					push @builds, $f;
 				}
@@ -236,14 +246,14 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 
 				my $build_choice = 0;
 				while ($build_choice = <STDIN>){
-						chomp ($build_choice);
-						if ($build_choice =~ /^\d+$/ and $build_choice <= scalar(@builds)){
-								$build = $builds[$build_choice-1];
-								print "\nOk great, going with '$igenomes{$igchoice} - $build' ($source)'\n\n";
-								sleep(1); last;
-						} else {
-								print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
-						}
+					chomp ($build_choice);
+					if ($build_choice =~ /^\d+$/ and $build_choice <= scalar(@builds)){
+						$build = $builds[$build_choice-1];
+						print "\nOk great, going with '$igenomes{$igchoice} - $build' ($source)'\n\n";
+						sleep(1); last;
+					} else {
+						print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+					}
 				}
 			}
 
@@ -273,8 +283,6 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 							sleep(1); last;
 					} elsif($name_choice =~ /[^\w-]/){
 							print "\nSorry, names can only contain the following: A-Z a-z 0-9 _ -\n\n";
-					} elsif($name_exists){
-							print "\nSorry, '$build' already exists, please choose a different name..\n\n";
 					} else {
 							my $t_name_exists = 0;
 							foreach my $type (values %REFERENCES){
@@ -294,19 +302,227 @@ Fields are delimited by whitespace, so do not include spaces in fields.
 			}
 
 			print OUT "\n/* $igenomes{$igchoice} $build (UPPMAX iGenomes) */\n".
-								"\@reference\tfasta\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/WholeGenomeFasta\t$igenomes{$igchoice}\t$build\n".
-								"\@reference\tbowtie\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/BowtieIndex/genome\t$igenomes{$igchoice}\t$build\n".
-								"\@reference\tbowtie2\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/Bowtie2Index/genome\t$igenomes{$igchoice}\t$build\n".
-								"\@reference\tbwa\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Sequence/BWAIndex/genome.fa\t$igenomes{$igchoice}\t$build\n".
-								"\@reference\tgtf\t$name\t/sw/data/uppnex/igenomes/$igenomes{$igchoice}/$source/$build/Annotation/Genes/genes.gtf\t$igenomes{$igchoice}\t$build\n\n";
+								"\@reference\tfasta\t$name\t$iGenomes_path/$igenomes{$igchoice}/$source/$build/Sequence/WholeGenomeFasta\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbowtie\t$name\t$iGenomes_path/$igenomes{$igchoice}/$source/$build/Sequence/BowtieIndex/genome\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbowtie2\t$name\t$iGenomes_path/$igenomes{$igchoice}/$source/$build/Sequence/Bowtie2Index/genome\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tbwa\t$name\t$iGenomes_path/$igenomes{$igchoice}/$source/$build/Sequence/BWAIndex/genome.fa\t$igenomes{$igchoice}\t$build\n".
+								"\@reference\tgtf\t$name\t$iGenomes_path/$igenomes{$igchoice}/$source/$build/Annotation/Genes/genes.gtf\t$igenomes{$igchoice}\t$build\n\n";
 
 			print "You can add another iGenome reference now if you would like.\n";
 
 		} # if($igchoice)
 	} # while($select_igenomes)
 
-	# TODO: UPPNEX reference genomes
-	print "\nCentral UPPNEX reference genomes not yet implemented in this wizard sorry..\n\n";
+
+	print "The UPPNEX reference genomes are a central set of reference\n".
+		  "genomes maintained by UPPMAX. You can find out more information\n".
+		  "about them here: https://www.uppmax.uu.se/reference-genomes\n\n".
+		  "Would you like to use any of the following UPPNEX references?\n\n";
+
+	# Parse the more variable UPPNEX file structure
+	my @reftypes = qw(fasta bowtie bowtie2 bwa star);
+	my %discovered_ref_files;
+	$discovered_ref_files{'fasta'} = [];
+	push(@{$discovered_ref_files{'fasta'}}, glob("$uppnex_path/*/*/concat/*.fa"));
+
+	$discovered_ref_files{'bowtie'} = [];
+	push(@{$discovered_ref_files{'bowtie'}}, glob("$uppnex_path/*/*/program_files/bowtie/concat.[0-9]*.ebwt"));
+
+	$discovered_ref_files{'bowtie2'} = [];
+	push(@{$discovered_ref_files{'bowtie2'}}, glob("$uppnex_path/*/*/program_files/bowtie2/concat.[0-9]*.bt2"));
+
+	$discovered_ref_files{'bwa'} = [];
+	push(@{$discovered_ref_files{'bwa'}}, glob("$uppnex_path/*/*/program_files/bwa/concat.fa.bwt"));
+
+	$discovered_ref_files{'star'} = [];
+	push(@{$discovered_ref_files{'star'}}, glob("$uppnex_path/*/*/program_files/star/concat/SA"));
+
+	my %ref_files;
+	foreach my $reftype (keys %discovered_ref_files) {
+		foreach my $f (@{$discovered_ref_files{$reftype}}){
+			print "$f\n" if ($f =~ /Schizosaccharomyces/i);
+			if($f =~ /^$uppnex_path\/([^\/]+)\/([^\/]+)\//){
+				my $species = $1;
+				my $assembly = $2;
+
+				if ($reftype eq 'fasta'){
+					$f =~ s/[^\/]*\.fa$//;
+				}
+				if ($reftype eq 'bowtie'){
+					$f =~ s/\.\d+\.ebwt$//;
+				}
+				if ($reftype eq 'bowtie2'){
+					$f =~ s/\.\d+\.bt2$//;
+				}
+				if ($reftype eq 'bwa'){
+					$f =~ s/\.bwt2$//;
+				}
+				if ($reftype eq 'star'){
+					$f =~ s/SA$//;
+				}
+
+				$ref_files{$species} = () if(!defined($ref_files{$species}));
+				$ref_files{$species}{$assembly} = () if(!defined($ref_files{$species}));
+				$ref_files{$species}{$assembly}{$reftype} = $f;
+			}
+		}
+	}
+
+	# Go into UPPNEX reference genomes loop
+	print " # - Species                     Assemblies Fasta   Bowtie  Bowtie2  BWA    STAR\n".
+		  "---------------------------------------------------------------------------------\n";
+	my $doing_ur_genomes = 1;
+	while($doing_ur_genomes){
+		# Print available genomes
+		my $i = 1; my %ur_species_hash;
+		foreach my $species (sort keys %ref_files){
+			$ur_species_hash{$i} = $species;
+			my $thisline = ''; my $thislinelength = 0;
+			if ("@top_genomes" =~ /$species/){
+				$thisline .= " $i - ".(color 'green')."$species".(color 'reset');
+				$thislinelength = length(" $i - $species");
+			} else {
+				$thisline .= " $i - $species";
+				$thislinelength = length($thisline);
+			}
+			$thisline .= " " x (35 - $thislinelength);
+			$thisline .= "  ".(keys %{$ref_files{$species}})."        ";
+			for my $reftype (@reftypes){
+				my $found = 0;
+				for my $a (keys(%{$ref_files{$species}})){
+					if(defined($ref_files{$species}{$a}{$reftype})){
+						$found = 1;
+					}
+				}
+				if($found){
+					$thisline .=  (color 'green')."\x{2713}".(color 'reset')."       ";
+				} else {
+					$thisline .=  (color 'red')."\x{2717}".(color 'reset')."       ";
+				}
+			}
+			print $thisline."\n";
+
+			$i++;
+		}
+
+		print "\nType a number to add that organism, or press return to exit this wizard..\n\n";
+
+		# User input
+		my $num_urgenomes = keys %ur_species_hash;
+		my $urchoice = 0;
+		while ($urchoice = <STDIN>){
+			chomp ($urchoice);
+			if ($urchoice =~ /^\d+$/ and $urchoice <= $num_urgenomes){
+				print "\nGreat! Let's go with '$ur_species_hash{$urchoice}'\n\n";
+				last;
+			} elsif(length($urchoice) == 0){
+				$urchoice = 0;
+				$doing_ur_genomes = 0;
+				last;
+			} else {
+				print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+			}
+		}
+		if($urchoice > 0){
+			my $species = $ur_species_hash{$urchoice};
+			use Data::Dumper;
+			my @assemblies = keys(%{$ref_files{$species}});
+			my $assembly;
+			if(scalar(@assemblies) == 1){
+				$assembly = $assemblies[0];
+				print "Only one genome build found, so going ahead with '$species - $assembly'\n\n";
+				sleep(1);
+			} else {
+				print "I found ".scalar(@assemblies)." genome builds for species:\n\n";
+				print " # - Assembly          Fasta   Bowtie  Bowtie2  BWA    STAR\n".
+					  "------------------------------------------------------------\n";
+				for my $i (1..scalar(@assemblies)){
+					my $thisline = "  $i - $assemblies[$i-1]";
+					$thisline .= " " x (25 - length($thisline));
+					for my $reftype (@reftypes){
+						if(defined($ref_files{$species}{$assemblies[$i-1]}{$reftype})){
+							$thisline .= (color 'green')."\x{2713}".(color 'reset')."       ";
+						} else {
+							$thisline .= (color 'red')."\x{2717}".(color 'reset')."       ";
+						}
+					}
+					print $thisline."\n";
+				}
+				print "\nWhich would you like to use?\n\n";
+
+				my $assembly_choice = 0;
+				while ($assembly_choice = <STDIN>){
+					chomp ($assembly_choice);
+					if ($assembly_choice =~ /^\d+$/ and $assembly_choice <= scalar(@assemblies)){
+						$assembly = $assemblies[$assembly_choice-1];
+						print "\nOk great, going with '$species - $assembly'\n\n";
+						sleep(1); last;
+					} else {
+						print "\nSorry, I didn't understand that.\nCould you try again please?\n\n";
+					}
+				}
+			}
+
+			my $name;
+			print "Finally, we need a name for this reference for use in Cluster Flow.\n".
+				  "For example, you typically launch pipelines with a command such as:\n".
+				  "  cf --genome <name> <pipeline> <files>\n\n";
+			my $name_exists = 0;
+			foreach my $type (values %REFERENCES){
+				foreach my $ref (keys %{$type}){
+					$name_exists = 1 if($assembly =~ /^$ref$/);
+				}
+			}
+			if($name_exists){
+				print "You already have a genome called '$assembly', please choose a new name..\n\n";
+			} else {
+				print "Leave blank and press enter to use the genome build name ($assembly)\n\n";
+			}
+
+			my $name_choice;
+			while ($name_choice = <STDIN>){
+				chomp ($name_choice);
+				if (length($name_choice) == 0 && !$name_exists){
+					print "Ok, I'll call this reference '$assembly' - you can use it as follows:\n".
+						  "  cf --genome $assembly <pipeline> <files>\n\n";
+					$name = $assembly;
+					sleep(1); last;
+				} elsif($name_choice =~ /[^\w-]/){
+					print "\nSorry, names can only contain the following: A-Z a-z 0-9 _ -\n\n";
+				} else {
+					my $t_name_exists = 0;
+					foreach my $type (values %REFERENCES){
+						foreach my $ref (keys %{$type}){
+							$t_name_exists = 1 if($name_choice =~ /^$ref$/);
+						}
+					}
+					if($t_name_exists){
+						print "\nSorry, you already have a genome called '$name_choice' - please choose another name.\n\n";
+					} else {
+						print "\nGreat, I'll call this reference '$name_choice' - you can use it as follows:\n".
+							  "  cf --genome $name_choice <pipeline> <files>\n\n";
+						$name = $name_choice;
+						sleep(1); last;
+					}
+				}
+			}
+
+			print OUT "\n/* $species $assembly (UPPNEX Reference Genome) */\n";
+			for my $reftype (@reftypes){
+				if(defined($ref_files{$species}{$assembly}{$reftype})){
+					print OUT "\@reference\t$reftype\t$name\t$ref_files{$species}{$assembly}{$reftype}\t$species\t$assembly\n";
+				}
+			}
+
+			print "\nYou can add another iGenome reference now if you would like:\n\n";
+
+		} #if($urchoice > 0)
+
+	} # while($doing_ur_genomes)
+
+	print "\nIf you have other reference genomes that you would like to\n".
+		  "use with Cluster Flow, please run the main generic Cluster Flow\n".
+		  "genomes wizard: 'cf --add_genome'\n\n";
 
 	close OUT;
 }
