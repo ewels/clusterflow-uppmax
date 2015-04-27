@@ -29,9 +29,9 @@ do
 #SBATCH -o make_bismark_ref.out
 
 ## BISMARK INDEX
-module load bismark
 module load bowtie/1.1.0
 module load bowtie2/2.2.3
+module load bismark
 bismark_genome_preparation ./
 bismark_genome_preparation --bowtie2 ./
 
