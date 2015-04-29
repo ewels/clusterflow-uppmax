@@ -1,3 +1,4 @@
+
 /*
 Clusterflow Config
 -------------------
@@ -41,6 +42,9 @@ These will be overwritten by any with the same name in ~/clusterflow/clusterflow
 /* To stop cluster flow trying to load environment modules, uncomment the following line: */
 /* @ignore_modules	true */
 
+/* Sometimes, you always need to load certain modules. Add these here. */
+@environment_module_always bioinfo-tools
+
 /* If your modules have a different name to those being requested in
    a module, you can create aliases. You can also use aliases to
 	 specify particular module versions */
@@ -48,6 +52,7 @@ These will be overwritten by any with the same name in ~/clusterflow/clusterflow
 @environment_module_alias	trim_galore	TrimGalore
 @environment_module_alias	sratoolkit	sratools
 @environment_module_alias	tophat	tophat/2.0.12
+@environment_module_alias	STAR	star
 
 
 /****************/
