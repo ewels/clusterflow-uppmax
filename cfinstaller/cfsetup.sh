@@ -15,8 +15,7 @@ echo -e "### Step 1: Cloning github repositories..\n"
 STARTDIR=$(pwd)
 mkdir -p $1
 cd $1
-git clone https://github.com/ewels/clusterflow.git .
-git checkout v0.4devel
+git clone --recursive https://github.com/ewels/clusterflow.git .
 git clone https://github.com/ewels/clusterflow-uppmax.git scripts
 
 # Copy the UPPMAX config file
@@ -43,3 +42,4 @@ sleep 2
 ./cf --setup
 
 echo -e "\n\n#######  Cluster Flow installation complete  #######\n\n"
+echo -e "\n\n#######   Now please log out and in again.   #######\n\n"
