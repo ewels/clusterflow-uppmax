@@ -31,13 +31,21 @@ logToSyslog
 # Directories for the program:
 prepend-path    PATH            $modroot
 prepend-path    PATH            $modroot/scripts
+prepend-path    PATH            $modroot/clusterflow-uppmax
 
 # Look for presence of genomes config file
-if [ ! -f ~/.clusterflow/genomes.config ];
-then
-echo "====================================================================================
-No Cluster Flow reference genomes config file found (~/.clusterflow/genomes.config)
-To add your own custom genome references, run 'cf --add_genome'
-Run 'cf-uppmax --add_genome' to add UPPMAX genome references (central or Illumina iGenomes).
-===================================================================================="
-fi
+
+set cfconfig $env(HOME)/.clusterflow/genomes.config
+
+if { [module-info mode load] } {
+    if { ! [ file exists $cfconfig ] } {
+        puts stderr "============================================================="
+        puts stderr "No Cluster Flow reference genomes config file found at"
+        puts stderr "   $cfconfig"
+        puts stderr "To add your own custom genome references, run 'cf --add_genome'."
+        puts stderr "Run 'cf-uppmax --add_genome' to add UPPMAX genome references"
+        puts stderr "(central or Illumina iGenomes)."
+        puts stderr "============================================================="
+    }
+}
+
